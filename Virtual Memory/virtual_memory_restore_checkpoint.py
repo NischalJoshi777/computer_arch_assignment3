@@ -17,7 +17,6 @@ processor = SimpleProcessor(cpu_type=CPUTypes.O3, isa=ISA.X86, num_cores=1)
 
 memory = SingleChannelDDR3_1600(size="1GB")
 
-
 cache_hierarchy = PrivateL1PrivateL2WalkCacheHierarchy(
     l1d_size="32kB", l1i_size="32kB", l2_size="512kB"
 )
@@ -30,39 +29,36 @@ board = X86Board(
     cache_hierarchy=cache_hierarchy,
 )
 
-# Create the shell script to write, compile, and run the C++ Hello World program
-readfile_contents = """
-cd tests/test-progs/hello/bin/x86/linux/hello;  # Navigate to the directory containing hello
-./hello;                      # Execute the hello program
-m5 exit;                      # Exit the simulation after running hello
-"""
-
-# Set the Full System workload.
+# Set the Full System workload from checkpoint
 board.set_kernel_disk_workload(
     kernel=obtain_resource("x86-linux-kernel-5.4.49"),
     disk_image=obtain_resource("x86-ubuntu-18.04-img"),
-    checkpoint=  Path("/Users/nischaljsh/Documents/gem5/virutal"),
+    checkpoint=  Path("/Users/nischaljsh/Documents/gem5/virtual"),
 )
-
-board.readfile = Path("tests/test-progs/hello/bin/x86/linux/hello")
-
-#modifying table buffer
-def modify_tlb_after_init():
-    for cpu in board.processor.get_cores():
-        # Access the MMU of the core and modify ITLB and DTLB
-        mmu = cpu.core.mmu
-        mmu.itb.size = 128  
-        mmu.dtb.size = 128 
-
-modify_tlb_after_init()
-
 
 sim = Simulator(board=board, full_system=True)
 print("Restoring from checkpoint and beginning simulation!")
 sim.run()
 print(
     "Exiting @ tick {} because {}.".format(
-        sim.get_current_tick(), 
+        sim.get_current_tick(),
         sim.get_last_exit_event_cause()
     )
 )
+
+
+
+
+# Modify TLB sizes after board initialization
+def modify_tlb_sizes(board):
+    for core in board.get_processor().get_cores():
+        # Modify ITLB (Instruction TLB) size
+        core.get_mmu().itb.size = 512  # Set to desired size
+        core.get_mmu().dtb.size = 512  # Set to desired size
+        core.get_mmu().page.size= "4KB"
+        print(f"  ITLB size: {core.get_mmu().itb.size}")
+        print(f"  DTLB size: {core.get_mmu().dtb.size}")
+
+
+# Call the function to modify TLB sizes
+modify_tlb_sizes(board)
